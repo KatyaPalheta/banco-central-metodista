@@ -73,7 +73,7 @@ export default function App() {
     <div className="min-h-screen bg-gradient-to-b from-[#e8f4fd] via-[#f0f9ff] to-[#fcf8ee] text-slate-800 flex flex-col justify-between relative overflow-hidden select-none">
       
       {/* Playful Floating Light Elements (Sun, clouds, bubbles) */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden">
         {/* Soft Sunny Glow */}
         <div className="absolute -top-16 -right-16 w-64 h-64 bg-amber-200/40 rounded-full blur-3xl" />
         <div className="absolute top-12 left-10 text-amber-400/50 animate-float">
