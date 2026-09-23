@@ -160,11 +160,11 @@ export default function App() {
           <div className="absolute w-60 h-60 sm:w-80 sm:h-80 bg-gradient-to-tr from-amber-200/40 via-emerald-100/50 to-sky-200/40 rounded-full blur-2xl animate-glow pointer-events-none" />
 
           {/* Floating animated coin badges around the tree */}
-          <div className="absolute -top-2 -left-2 sm:left-2 px-3 py-1.5 bg-amber-400 text-amber-950 rounded-full shadow-md font-['Fredoka'] font-bold text-xs sm:text-sm animate-float flex items-center gap-1 border border-amber-200">
+          <div className="absolute z-20 -top-2 -left-2 sm:left-2 px-3 py-1.5 bg-amber-400 text-amber-950 rounded-full shadow-md font-['Fredoka'] font-bold text-xs sm:text-sm animate-float flex items-center gap-1 border border-amber-200">
             <span>🪙 Q$ 5</span>
           </div>
 
-          <div className="absolute -bottom-1 -right-2 sm:right-2 px-3 py-1.5 bg-emerald-500 text-white rounded-full shadow-md font-['Fredoka'] font-bold text-xs sm:text-sm animate-float-reverse flex items-center gap-1 border border-emerald-300">
+          <div className="absolute z-20 -bottom-1 -right-2 sm:right-2 px-3 py-1.5 bg-emerald-500 text-white rounded-full shadow-md font-['Fredoka'] font-bold text-xs sm:text-sm animate-float-reverse flex items-center gap-1 border border-emerald-300">
             <span>⭐ Queimacash!</span>
           </div>
 
