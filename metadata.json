@@ -1,0 +1,7 @@
+{
+  "name": "Banco Central Metodista",
+  "description": "Portal institucional oficial em desenvolvimento do Banco Central Metodista - Escola Municipal Metodista de Queimados.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
