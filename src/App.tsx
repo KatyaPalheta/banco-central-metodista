@@ -140,8 +140,12 @@ export default function App() {
 
         {/* Playful & Grand Title */}
         <h1 className="font-fun text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-slate-900 drop-shadow-xs">
-          Banco Central da <span className="text-blue-600 drop-shadow-xs">Escola Metodista</span>
-        </h1>
+  Banco Central da
+  <br />
+  <span className="text-blue-600 drop-shadow-xs">
+    Escola Metodista
+  </span>
+</h1>
 
         {/* Project Slogans */}
         <div className="mt-1 mb-2 space-y-0.5">
