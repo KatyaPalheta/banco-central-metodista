@@ -1,7 +1,6 @@
 {
-  "name": "Banco Central Metodista",
-  "description": "Portal institucional oficial em desenvolvimento do Banco Central Metodista - Escola Municipal Metodista de Queimados.",
-  "requestFramePermissions": [],
+  "name": "Banco Central da Escola Metodista",
+  "description": "Sistema web oficial do Banco Central da Escola Metodista de Queimados com Caixa Eletrônico com impressora térmica Bluetooth, gestão de contas e operações pedagógicas.",
+  "requestFramePermissions": ["bluetooth"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
-

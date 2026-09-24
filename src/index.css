@@ -1,16 +1,25 @@
 @import "tailwindcss";
 
-@layer base {
-  body {
-    font-family: 'Nunito', system-ui, -apple-system, sans-serif;
-  }
+@theme {
+  --font-nunito: "Nunito", system-ui, -apple-system, sans-serif;
+  --font-fredoka: "Fredoka", "Nunito", sans-serif;
 }
 
-.font-fun {
-  font-family: 'Fredoka', 'Nunito', sans-serif;
+body {
+  font-family: var(--font-nunito);
+  background: linear-gradient(180deg, #E8F4FD 0%, #F0F9FF 50%, #FCF8EE 100%);
+  min-height: 100vh;
 }
 
-@keyframes floatSlow {
+.font-fredoka {
+  font-family: var(--font-fredoka);
+}
+
+.font-nunito {
+  font-family: var(--font-nunito);
+}
+
+@keyframes gentle-float {
   0%, 100% {
     transform: translateY(0px) rotate(0deg);
   }
@@ -19,7 +28,7 @@
   }
 }
 
-@keyframes floatReverse {
+@keyframes gentle-float-reverse {
   0%, 100% {
     transform: translateY(0px) rotate(0deg);
   }
@@ -28,7 +37,7 @@
   }
 }
 
-@keyframes pulseGlow {
+@keyframes soft-glow {
   0%, 100% {
     opacity: 0.6;
     transform: scale(1);
@@ -40,14 +49,13 @@
 }
 
 .animate-float {
-  animation: floatSlow 4s ease-in-out infinite;
+  animation: gentle-float 4s ease-in-out infinite;
 }
 
 .animate-float-reverse {
-  animation: floatReverse 5s ease-in-out infinite;
+  animation: gentle-float-reverse 5s ease-in-out infinite;
 }
 
 .animate-glow {
-  animation: pulseGlow 3s ease-in-out infinite;
+  animation: soft-glow 3s ease-in-out infinite;
 }
-
