@@ -140,7 +140,7 @@ export default function App() {
 
         {/* Playful & Grand Title */}
         <h1 className="font-fun text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-slate-900 drop-shadow-xs">
-          Banco Central <span className="text-blue-600 drop-shadow-xs">Metodista</span>
+          Banco Central da <span className="text-blue-600 drop-shadow-xs">Escola Metodista</span>
         </h1>
 
         {/* Project Slogans */}
@@ -183,7 +183,7 @@ export default function App() {
           <div 
             onClick={handleMascotClick}
             className="relative cursor-pointer transition-transform duration-300 hover:scale-105 active:scale-95 group"
-            title="Clique na arvorezinha!"
+            title="Clique no Raizinho!"
           >
             <div className="w-56 h-56 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-3xl overflow-hidden p-2 bg-white/80 border-3 border-amber-300/80 shadow-xl shadow-sky-900/10 backdrop-blur-sm flex items-center justify-center relative">
               <img
@@ -199,7 +199,7 @@ export default function App() {
               {/* Cute hover helper pill */}
               <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 px-3.5 py-1 bg-slate-900/75 backdrop-blur-sm rounded-full text-[11px] font-bold text-amber-200 opacity-90 border border-white/20 shadow-xs flex items-center gap-1">
                 <Smile className="w-3 h-3 text-amber-300" />
-                <span>Toque na arvorezinha!</span>
+                <span>Toque no Raizinho!</span>
               </div>
             </div>
           </div>
