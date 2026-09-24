@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { X, ArrowDownCircle, Printer, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Student } from '../../domain/types';
 import { formatQueimacash, generateProtocol, formatDateTime } from '../../utils/normalization';
-import { buildReceiptBytes } from '../../services/escpos';
+import { buildReceiptBytes, ReceiptData } from '../../services/escpos';
+import { ReceiptPreviewModal } from './ReceiptPreviewModal';
 import { printerService } from '../../services/printerService';
 import { operationRepository } from '../../repositories/operationRepository';
 import { soundService } from '../../services/soundService';
@@ -22,6 +23,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   const [step, setStep] = useState<'input' | 'confirm' | 'printing' | 'success' | 'error'>('input');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastProtocol, setLastProtocol] = useState<string>('');
+  const [previewReceipt, setPreviewReceipt] = useState<ReceiptData | null>(null);
 
   const quickValues = [5, 10, 20, 50, 100];
 
@@ -54,15 +56,17 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
     try {
       // 1. Constrói bytes ESC/POS com aviso de OPERACAO PENDENTE
-      const receiptBytes = buildReceiptBytes({
-        tipo: 'DEPOSITO',
-        protocolo,
-        dataHora: dataHoraStr,
-        nomeAluno: student.nome,
-        turma: student.turma,
-        numeroConta: student.numeroConta,
-        valor,
-      });
+      const receiptData: ReceiptData = {
+  tipo: 'DEPOSITO',
+  protocolo,
+  dataHora: dataHoraStr,
+  nomeAluno: student.nome,
+  turma: student.turma,
+  numeroConta: student.numeroConta,
+  valor,
+};
+
+const receiptBytes = buildReceiptBytes(receiptData);
 
       // 2. Envia bytes diretamente para a impressora térmica via Web Bluetooth
       await printerService.printBytes(receiptBytes);
@@ -77,6 +81,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({
         tipo: 'DEPOSITO',
         valor,
       });
+      if (printerService.isSimulationMode()) {
+  setPreviewReceipt(receiptData);
+}
 
       soundService.playSuccessSound();
       setStep('success');
@@ -324,6 +331,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({
           </div>
         )}
       </div>
+      {previewReceipt && (
+  <ReceiptPreviewModal
+    data={previewReceipt}
+    onClose={() => setPreviewReceipt(null)}
+  />
+)}
     </div>
   );
 };

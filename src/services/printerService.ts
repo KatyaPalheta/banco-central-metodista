@@ -84,6 +84,7 @@ class PrinterService {
   private server: BluetoothRemoteGATTServer | null = null;
   private writableCharacteristic: BluetoothCharacteristic | null = null;
   private listeners: Set<StateListener> = new Set();
+  private simulationMode = false;
 
   private state: PrinterState = {
     status: 'disconnected',
@@ -107,6 +108,30 @@ class PrinterService {
     return { ...this.state };
   }
 
+public isSimulationMode(): boolean {
+  return this.simulationMode;
+}
+
+public enableSimulationMode(): void {
+  this.simulationMode = true;
+
+  this.updateState({
+    status: 'connected',
+    deviceName: 'Impressora Simulada — Modo de Teste',
+    errorMessage: null,
+  });
+}
+
+public disableSimulationMode(): void {
+  this.simulationMode = false;
+
+  this.updateState({
+    status: 'disconnected',
+    deviceName: null,
+    errorMessage: null,
+  });
+}
+
   public subscribe(listener: StateListener): () => void {
     this.listeners.add(listener);
     listener(this.getState());
@@ -128,13 +153,17 @@ class PrinterService {
   }
 
   public isConnected(): boolean {
-    return (
-      this.state.status === 'connected' &&
-      !!this.server &&
-      this.server.connected &&
-      !!this.writableCharacteristic
-    );
+  if (this.simulationMode) {
+    return true;
   }
+
+  return (
+    this.state.status === 'connected' &&
+    !!this.server &&
+    this.server.connected &&
+    !!this.writableCharacteristic
+  );
+}
 
   /**
    * Tenta reconectar a um dispositivo previamente autorizado pelo usuário
@@ -263,6 +292,11 @@ class PrinterService {
    * Envia bytes ESC/POS diretamente à impressora em blocos de ~100 bytes com pausa de 20ms
    */
   public async printBytes(bytes: Uint8Array): Promise<void> {
+    if (this.simulationMode) {
+  // Pequena pausa para simular o tempo de impressão
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  return;
+}
     if (!this.isConnected() || !this.writableCharacteristic) {
       throw new Error(
         'Impressora não está conectada. Verifique se a impressora térmica está ligada e conectada.'

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LogOut,
   ArrowDownCircle,
@@ -13,6 +13,8 @@ import { WithdrawModal } from './WithdrawModal';
 import { InvestmentModal } from './InvestmentModal';
 import { studentRepository } from '../../repositories/studentRepository';
 import { soundService } from '../../services/soundService';
+import { investmentRepository } from '../../repositories/investmentRepository';
+import { calculateRedemption } from '../../services/investmentConfig';
 
 interface StudentPanelProps {
   student: Student;
@@ -27,6 +29,10 @@ export const StudentPanel: React.FC<StudentPanelProps> = ({
 }) => {
   const [activeModal, setActiveModal] = useState<'none' | 'deposito' | 'saque' | 'investir'>('none');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [investmentSummary, setInvestmentSummary] = useState({
+  valorAplicado: 0,
+  valorAtual: 0,
+});
 
   const showNotification = (message: string, type: 'success' | 'info' = 'success') => {
     setNotification({ message, type });
@@ -35,18 +41,53 @@ export const StudentPanel: React.FC<StudentPanelProps> = ({
     }, 4500);
   };
 
-  const handleReloadStudent = async () => {
-    const updated = await studentRepository.getById(student.id);
-    if (updated) {
-      onRefreshStudent(updated);
+  const refreshFinancialData = async () => {
+  const [updatedStudent, investments] = await Promise.all([
+    studentRepository.getById(student.id),
+    investmentRepository.getByStudent(student.id),
+  ]);
+
+  if (updatedStudent) {
+    onRefreshStudent(updatedStudent);
+  }
+
+  const investimentosEmAberto = investments.filter(
+    (inv) =>
+      inv.status === 'ATIVO' ||
+      inv.status === 'RESGATE_PENDENTE'
+  );
+
+  const valorAplicado = investimentosEmAberto.reduce(
+    (total, inv) => total + inv.valorAplicado,
+    0
+  );
+
+  const valorAtual = investimentosEmAberto.reduce((total, inv) => {
+    // Se o resgate já foi solicitado, mantém o valor calculado
+    // até o professor confirmar.
+    if (inv.status === 'RESGATE_PENDENTE') {
+      return total + inv.valorResgateCalculado;
     }
-  };
+
+    return total + calculateRedemption(inv).valorTotalReceber;
+  }, 0);
+
+  setInvestmentSummary({
+    valorAplicado: Number(valorAplicado.toFixed(2)),
+    valorAtual: Number(valorAtual.toFixed(2)),
+  });
+};
+useEffect(() => {
+  void refreshFinancialData();
+}, [student.id]);
 
   const handleExit = () => {
     soundService.playNoteSound(10);
     onLogout();
   };
-
+const patrimonioTotal = Number(
+  (student.saldo + investmentSummary.valorAtual).toFixed(2)
+);
   return (
     <div className="max-w-3xl mx-auto">
       {/* Toast Notification */}
@@ -86,17 +127,58 @@ export const StudentPanel: React.FC<StudentPanelProps> = ({
           </button>
         </div>
 
-        {/* Display Oficial do Saldo Confirmado Atual */}
-        <div className="bg-gradient-to-br from-emerald-50 via-sky-50 to-amber-50/50 rounded-2xl p-6 border border-emerald-200/80 text-center relative z-10 shadow-xs">
-          <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-800">
-            Saldo Confirmado Atual
-          </span>
-          <div className="font-fredoka text-5xl sm:text-6xl font-bold text-emerald-600 my-2 tracking-tight">
-            {formatQueimacash(student.saldo)}
+                {/* Composição financeira do aluno */}
+        <div className="relative z-10 space-y-3">
+
+          {/* SALDO DISPONÍVEL — informação principal */}
+          <div className="bg-emerald-50 rounded-3xl p-6 sm:p-8 border border-emerald-200 text-center">
+            <span className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-emerald-800">
+              Saldo disponível
+            </span>
+
+            <div className="font-fredoka text-4xl sm:text-5xl font-bold text-emerald-600 my-2">
+              {formatQueimacash(student.saldo)}
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-500">
+              Valor disponível para usar, sacar ou investir.
+            </p>
           </div>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
-            Moeda oficial do projeto pedagógico da Escola Municipal Metodista de Queimados.
-          </p>
+
+          {/* Informações secundárias */}
+          <div className="grid grid-cols-2 gap-3">
+
+            {/* INVESTIMENTOS */}
+            <div className="bg-purple-50 rounded-xl px-3 py-3 border border-purple-200">
+              <div className="text-[10px] font-extrabold uppercase tracking-wide text-purple-700">
+                Guardado em investimentos
+              </div>
+
+              <div className="font-fredoka text-xl font-bold text-purple-600 mt-1">
+                {formatQueimacash(investmentSummary.valorAtual)}
+              </div>
+
+              <div className="text-[10px] text-slate-500 mt-1">
+                Valor aplicado: {formatQueimacash(investmentSummary.valorAplicado)}
+              </div>
+            </div>
+
+            {/* TOTAL */}
+            <div className="bg-sky-50 rounded-xl px-3 py-3 border border-sky-200">
+              <div className="text-[10px] font-extrabold uppercase tracking-wide text-sky-700">
+                Total que você tem
+              </div>
+
+              <div className="font-fredoka text-xl font-bold text-sky-600 mt-1">
+                {formatQueimacash(patrimonioTotal)}
+              </div>
+
+              <div className="text-[10px] text-slate-500 mt-1">
+                Conta + investimentos
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
 
@@ -183,7 +265,7 @@ export const StudentPanel: React.FC<StudentPanelProps> = ({
           onSuccess={(protocolo) => {
             setActiveModal('none');
             showNotification(`Comprovante ${protocolo} emitido! Entregue ao professor.`);
-            handleReloadStudent();
+            refreshFinancialData();
           }}
         />
       )}
@@ -195,26 +277,38 @@ export const StudentPanel: React.FC<StudentPanelProps> = ({
           onSuccess={(protocolo) => {
             setActiveModal('none');
             showNotification(`Comprovante ${protocolo} emitido! Apresente ao professor.`);
-            handleReloadStudent();
+            refreshFinancialData();
           }}
         />
       )}
 
       {activeModal === 'investir' && (
-        <InvestmentModal
-          student={student}
-          onClose={() => setActiveModal('none')}
-          onSuccessApplication={() => {
-            setActiveModal('none');
-            showNotification(`Aplicação em investimento concluída com sucesso!`);
-            handleReloadStudent();
-          }}
-          onSuccessRedemption={(protocolo) => {
-            setActiveModal('none');
-            showNotification(`Solicitação de resgate ${protocolo} impressa! Apresente ao professor.`);
-            handleReloadStudent();
-          }}
-        />
+       <InvestmentModal
+  student={student}
+
+  onClose={async () => {
+    await refreshFinancialData();
+    setActiveModal('none');
+  }}
+
+  onSuccessApplication={async () => {
+    await refreshFinancialData();
+    setActiveModal('none');
+
+    showNotification(
+      'Aplicação em investimento concluída com sucesso!'
+    );
+  }}
+
+  onSuccessRedemption={async (protocolo) => {
+    await refreshFinancialData();
+    setActiveModal('none');
+
+    showNotification(
+      `Solicitação de resgate ${protocolo} impressa! Apresente ao professor.`
+    );
+  }}
+/>
       )}
     </div>
   );

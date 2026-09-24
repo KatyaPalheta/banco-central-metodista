@@ -45,6 +45,22 @@ export const CaixaView: React.FC = () => {
 
   return (
     <div className="py-2">
+      {printerService.isSimulationMode() && (
+  <div className="mb-4 p-3 rounded-2xl bg-amber-100 border-2 border-amber-300 text-amber-900 flex flex-wrap items-center justify-between gap-3 text-sm">
+    <div>
+      <strong>🧪 MODO DE TESTE:</strong>{' '}
+      impressora simulada. Nenhum comprovante físico será impresso.
+    </div>
+
+    <button
+      type="button"
+      onClick={() => printerService.disableSimulationMode()}
+      className="px-3 py-1.5 rounded-xl bg-white hover:bg-amber-50 border border-amber-300 font-bold text-xs cursor-pointer"
+    >
+      SAIR DO MODO DE TESTE
+    </button>
+  </div>
+)}
       {/* O PrinterGate bloqueia toda e qualquer operação se a impressora não estiver conectada */}
       <PrinterGate printerState={printerState}>
         {stage === 'search' && (

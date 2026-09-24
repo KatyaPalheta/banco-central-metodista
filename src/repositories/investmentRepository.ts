@@ -4,34 +4,7 @@ import { studentRepository } from './studentRepository';
 
 const STORAGE_KEY = 'bcem_investments_v1';
 
-const INITIAL_MOCK_INVESTMENTS: InvestmentRecord[] = [
-  {
-    id: 'inv-mock-01',
-    alunoId: 'alu-401-01', // Lucas Silva Pereira
-    opcaoId: 'OPCAO_1',
-    opcaoNome: INVESTMENT_CONFIGS.OPCAO_1.nome,
-    valorAplicado: 20.0,
-    dataAplicacao: new Date(Date.now() - 15 * 86400000).toISOString(),
-    dataVencimento: new Date(Date.now() + 15 * 86400000).toISOString(),
-    status: 'ATIVO',
-    rendimentoAcumulado: 0.5,
-    valorResgateCalculado: 20.5,
-    penalidadeAplicada: 0,
-  },
-  {
-    id: 'inv-mock-02',
-    alunoId: 'alu-501-01', // Joao Pedro
-    opcaoId: 'OPCAO_3',
-    opcaoNome: INVESTMENT_CONFIGS.OPCAO_3.nome,
-    valorAplicado: 50.0,
-    dataAplicacao: new Date(Date.now() - 20 * 86400000).toISOString(),
-    dataVencimento: new Date(Date.now() + 40 * 86400000).toISOString(),
-    status: 'ATIVO',
-    rendimentoAcumulado: 10.0,
-    valorResgateCalculado: 55.0,
-    penalidadeAplicada: 5.0,
-  },
-];
+const INITIAL_MOCK_INVESTMENTS: InvestmentRecord[] = [];
 
 class InvestmentRepository {
   private getStorage(): InvestmentRecord[] {
@@ -98,11 +71,10 @@ class InvestmentRepository {
     const config = INVESTMENT_CONFIGS[opcaoId];
     const now = new Date();
     const dataVencimento = new Date(
-      now.getTime() + (config.prazoMinimoDias || 30) * 86400000
-    );
+  now.getTime() + config.prazoMinimoDias * 86400000
+);
 
-    const rendimentoTeorico = (valor * config.rendimentoTaxaPercentual) / 100;
-
+    
     const newRecord: InvestmentRecord = {
       id: `inv-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
       alunoId,
@@ -112,8 +84,8 @@ class InvestmentRepository {
       dataAplicacao: now.toISOString(),
       dataVencimento: dataVencimento.toISOString(),
       status: 'ATIVO',
-      rendimentoAcumulado: Number(rendimentoTeorico.toFixed(2)),
-      valorResgateCalculado: Number((valor + rendimentoTeorico).toFixed(2)),
+      rendimentoAcumulado: 0,
+valorResgateCalculado: valor,
       penalidadeAplicada: 0,
     };
 

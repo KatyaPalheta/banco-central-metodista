@@ -15,6 +15,8 @@ export const PrinterGate: React.FC<PrinterGateProps> = ({
 }) => {
   const [connecting, setConnecting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const simulationEnabled =
+  import.meta.env.VITE_ENABLE_PRINTER_SIMULATION === 'true';
 
   const handleConnect = async () => {
     setLocalError(null);
@@ -49,6 +51,10 @@ export const PrinterGate: React.FC<PrinterGateProps> = ({
       setConnecting(false);
     }
   };
+  const handleSimulation = () => {
+  printerService.enableSimulationMode();
+  soundService.playSuccessSound();
+};
 
   // Se a impressora está conectada e funcional, exibe a interface do Caixa normalmente
   if (printerState.status === 'connected') {
@@ -128,6 +134,24 @@ export const PrinterGate: React.FC<PrinterGateProps> = ({
             <RefreshCw className={`w-4 h-4 ${connecting ? 'animate-spin' : ''}`} />
             Tentar Reconectar Dispositivo Conhecido
           </button>
+          {simulationEnabled && (
+  <>
+    <div className="flex items-center gap-2 my-2 text-xs text-amber-700 font-bold">
+      <div className="h-px flex-1 bg-amber-200" />
+      MODO DE TESTE
+      <div className="h-px flex-1 bg-amber-200" />
+    </div>
+
+    <button
+      type="button"
+      onClick={handleSimulation}
+      className="w-full py-3 px-5 rounded-2xl bg-amber-100 hover:bg-amber-200 active:scale-98 text-amber-900 border-2 border-amber-300 font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+    >
+      <CheckCircle2 className="w-5 h-5" />
+      SIMULAR IMPRESSORA
+    </button>
+  </>
+)}
         </div>
 
         <div className="mt-8 pt-6 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-center gap-2">

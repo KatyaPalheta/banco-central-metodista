@@ -224,6 +224,8 @@ export interface ReceiptData {
   valor: number;
   detalhes?: {
     opcaoInvestimento?: string;
+    prazoDias?: number;
+    dataVencimento?: string;
     rendimentoBruto?: number;
     penalidade?: number;
     valorLiquido?: number;
@@ -277,6 +279,16 @@ export function buildReceiptBytes(data: ReceiptData): Uint8Array {
   if (data.detalhes?.opcaoInvestimento) {
     b.keyValue('MODALIDADE:', data.detalhes.opcaoInvestimento);
   }
+  if (data.detalhes?.prazoDias !== undefined) {
+  b.keyValue(
+    'PRAZO:',
+    `${data.detalhes.prazoDias} ${data.detalhes.prazoDias === 1 ? 'dia' : 'dias'}`
+  );
+}
+
+if (data.detalhes?.dataVencimento) {
+  b.keyValue('VENCIMENTO:', data.detalhes.dataVencimento);
+}
   if (data.detalhes?.penalidade && data.detalhes.penalidade > 0) {
     b.keyValue('PENALIDADE:', `- Q$ ${data.detalhes.penalidade.toFixed(2).replace('.', ',')}`);
   }

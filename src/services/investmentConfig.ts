@@ -15,7 +15,7 @@ export const INVESTMENT_CONFIGS: Record<InvestmentOptionId, InvestmentOptionConf
     descricaoCurta: 'Menor rendimento, resgate a qualquer momento sem penalidade.',
     detalhesRegra: 'Ideal para quem pode precisar do Queimacash logo. Você pode resgatar a qualquer momento e receber o rendimento proporcional sem nenhum desconto.',
     rendimentoTaxaPercentual: 5, // 5% de rendimento (parâmetro de teste)
-    prazoMinimoDias: 0, // Resgate livre imediato
+    prazoMinimoDias: 1, // Resgate livre imediato
     permiteResgateAntecipado: true,
     penalidadeAntecipadaPercentual: 0, // Sem penalidade
     corDestaque: 'emerald',
@@ -26,8 +26,8 @@ export const INVESTMENT_CONFIGS: Record<InvestmentOptionId, InvestmentOptionConf
     nome: 'Opção 2 - Prazo Determinado',
     descricaoCurta: 'Rendimento maior com prazo fixo. O valor fica guardado até o vencimento.',
     detalhesRegra: 'Para quem planeja guardar por um tempo determinado. O resgate fica bloqueado até o vencimento para garantir o rendimento maior.',
-    rendimentoTaxaPercentual: 12, // 12% de rendimento (parâmetro de teste)
-    prazoMinimoDias: 30, // 30 dias de prazo fixo (para teste)
+    rendimentoTaxaPercentual: 10, // 12% de rendimento (parâmetro de teste)
+    prazoMinimoDias: 7, // 30 dias de prazo fixo (para teste)
     permiteResgateAntecipado: false, // Não permite antes do vencimento
     penalidadeAntecipadaPercentual: 0,
     corDestaque: 'amber',
@@ -39,7 +39,7 @@ export const INVESTMENT_CONFIGS: Record<InvestmentOptionId, InvestmentOptionConf
     descricaoCurta: 'Maior rendimento com prazo longo. Permite resgate antes com taxa de penalidade.',
     detalhesRegra: 'Para quem busca o maior crescimento possível. Se precisar retirar antes do prazo final, o sistema calcula uma penalidade sobre o rendimento.',
     rendimentoTaxaPercentual: 20, // 20% de rendimento no vencimento (parâmetro de teste)
-    prazoMinimoDias: 60, // 60 dias de prazo total
+    prazoMinimoDias: 30, // 60 dias de prazo total
     permiteResgateAntecipado: true, // Permite antecipado
     penalidadeAntecipadaPercentual: 50, // Penalidade de 50% sobre o rendimento acumulado se resgatar antes
     corDestaque: 'purple',
@@ -72,12 +72,16 @@ export function calculateRedemption(investment: InvestmentRecord): {
   valorTotalReceber: number;
 } {
   const config = INVESTMENT_CONFIGS[investment.opcaoId];
-  const now = new Date();
-  const dataVencimento = new Date(investment.dataVencimento);
-  const isVencido = now >= dataVencimento;
 
-  // Opção 2: bloqueada se não venceu
-  if (!isVencido && !config.permiteResgateAntecipado) {
+  const now = new Date();
+  const dataAplicacao = new Date(investment.dataAplicacao);
+  const dataVencimento = new Date(investment.dataVencimento);
+
+  const isVencido = now >= dataVencimento;
+  const isAntecipado = !isVencido;
+
+  // Modalidades bloqueadas não podem ser resgatadas antes do vencimento
+  if (isAntecipado && !config.permiteResgateAntecipado) {
     return {
       podeResgatar: false,
       motivoBloqueio: `Esta modalidade tem prazo fixo. O valor estará disponível para resgate a partir de ${dataVencimento.toLocaleDateString('pt-BR')}.`,
@@ -89,31 +93,63 @@ export function calculateRedemption(investment: InvestmentRecord): {
     };
   }
 
-  // Rendimento teórico total configurado
-  const rendimentoTotal = (investment.valorAplicado * config.rendimentoTaxaPercentual) / 100;
-  
-  let rendimentoCalculado = rendimentoTotal;
-  let penalidade = 0;
-  const isAntecipado = !isVencido;
+  const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
-  if (isAntecipado) {
-    if (investment.opcaoId === 'OPCAO_1') {
-      // Opção 1: rendimento proporcional básico sem penalidade (para testes, aplicamos 50% do rendimento se antes de 30 dias)
-      rendimentoCalculado = Number((rendimentoTotal * 0.5).toFixed(2));
-      penalidade = 0;
-    } else if (investment.opcaoId === 'OPCAO_3') {
-      // Opção 3 antecipada: penalidade configurada sobre o rendimento
-      penalidade = Number((rendimentoCalculado * (config.penalidadeAntecipadaPercentual / 100)).toFixed(2));
-    }
+  const totalDias = Math.max(
+    1,
+    Math.round(
+      (dataVencimento.getTime() - dataAplicacao.getTime()) / MS_POR_DIA
+    )
+  );
+
+  const diasDecorridos = Math.max(
+    0,
+    Math.floor(
+      (now.getTime() - dataAplicacao.getTime()) / MS_POR_DIA
+    )
+  );
+
+  // Nunca rende além do prazo contratado
+  const diasConsiderados = Math.min(diasDecorridos, totalDias);
+
+  const proporcaoTempo = diasConsiderados / totalDias;
+
+  // Rendimento máximo somente no vencimento
+  const rendimentoNoVencimento =
+    (investment.valorAplicado * config.rendimentoTaxaPercentual) / 100;
+
+  // Quanto realmente foi ganho até hoje
+  const rendimentoBruto = Number(
+    (rendimentoNoVencimento * proporcaoTempo).toFixed(2)
+  );
+
+  let penalidade = 0;
+
+  // Penalidade somente sobre o rendimento já acumulado
+  if (
+    isAntecipado &&
+    config.penalidadeAntecipadaPercentual > 0
+  ) {
+    penalidade = Number(
+      (
+        rendimentoBruto *
+        (config.penalidadeAntecipadaPercentual / 100)
+      ).toFixed(2)
+    );
   }
 
-  const rendimentoLiquido = Math.max(0, rendimentoCalculado - penalidade);
-  const valorTotalReceber = Number((investment.valorAplicado + rendimentoLiquido).toFixed(2));
+  const rendimentoLiquido = Number(
+    Math.max(0, rendimentoBruto - penalidade).toFixed(2)
+  );
+
+  const valorTotalReceber = Number(
+    (investment.valorAplicado + rendimentoLiquido).toFixed(2)
+  );
 
   return {
     podeResgatar: true,
     isAntecipado,
-    rendimentoBruto: rendimentoCalculado,
+    rendimentoBruto,
     penalidade,
     rendimentoLiquido,
     valorTotalReceber,

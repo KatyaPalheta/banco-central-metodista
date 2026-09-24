@@ -25,7 +25,8 @@ import {
 import { investmentRepository } from '../../repositories/investmentRepository';
 import { operationRepository } from '../../repositories/operationRepository';
 import { printerService } from '../../services/printerService';
-import { buildReceiptBytes } from '../../services/escpos';
+import { buildReceiptBytes, ReceiptData } from '../../services/escpos';
+import { ReceiptPreviewModal } from './ReceiptPreviewModal';
 import { formatQueimacash, generateProtocol, formatDateTime } from '../../utils/normalization';
 import { soundService } from '../../services/soundService';
 
@@ -63,6 +64,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastProtocol, setLastProtocol] = useState<string>('');
+  const [previewReceipt, setPreviewReceipt] = useState<ReceiptData | null>(null);
 
   const options = getAvailableInvestmentOptions();
 
@@ -106,25 +108,42 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
     const dataHoraStr = formatDateTime();
 
     try {
+
+      const dataAplicacao = new Date();
+
+const dataVencimento = new Date(
+  dataAplicacao.getTime() +
+    selectedOption.prazoMinimoDias * 24 * 60 * 60 * 1000
+);
+
+const dataVencimentoFormatada =
+  dataVencimento.toLocaleDateString('pt-BR');
       // 1. Constrói comprovante impresso
-      const receiptBytes = buildReceiptBytes({
-        tipo: 'INVESTIMENTO_APLICACAO',
-        protocolo,
-        dataHora: dataHoraStr,
-        nomeAluno: student.nome,
-        turma: student.turma,
-        numeroConta: student.numeroConta,
-        valor: applyAmount,
-        detalhes: {
-          opcaoInvestimento: selectedOption.nome,
-        },
-      });
+      const receiptData: ReceiptData = {
+  tipo: 'INVESTIMENTO_APLICACAO',
+  protocolo,
+  dataHora: dataHoraStr,
+  nomeAluno: student.nome,
+  turma: student.turma,
+  numeroConta: student.numeroConta,
+  valor: applyAmount,
+  detalhes: {
+    opcaoInvestimento: selectedOption.nome,
+    prazoDias: selectedOption.prazoMinimoDias,
+  dataVencimento: dataVencimentoFormatada,
+  },
+};
+
+const receiptBytes = buildReceiptBytes(receiptData);
 
       // 2. Envia comprovante à impressora térmica
       await printerService.printBytes(receiptBytes);
 
       // 3. Efetiva aplicação imediatamente (reduz saldo e registra)
       await investmentRepository.applyInvestment(student.id, selectedOption.id, applyAmount);
+      if (printerService.isSimulationMode()) {
+  setPreviewReceipt(receiptData);
+}
 
       soundService.playSuccessSound();
       setApplyStep('success');
@@ -164,21 +183,23 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
 
     try {
       // 1. Monta comprovante ESC/POS com destaque de OPERACAO PENDENTE
-      const receiptBytes = buildReceiptBytes({
-        tipo: 'INVESTIMENTO_RESGATE',
-        protocolo,
-        dataHora: dataHoraStr,
-        nomeAluno: student.nome,
-        turma: student.turma,
-        numeroConta: student.numeroConta,
-        valor: selectedForRedemption.valorAplicado,
-        detalhes: {
-          opcaoInvestimento: selectedForRedemption.opcaoNome,
-          rendimentoBruto: calc.rendimentoBruto,
-          penalidade: calc.penalidade,
-          valorLiquido: calc.valorTotalReceber,
-        },
-      });
+      const receiptData: ReceiptData = {
+  tipo: 'INVESTIMENTO_RESGATE',
+  protocolo,
+  dataHora: dataHoraStr,
+  nomeAluno: student.nome,
+  turma: student.turma,
+  numeroConta: student.numeroConta,
+  valor: selectedForRedemption.valorAplicado,
+  detalhes: {
+    opcaoInvestimento: selectedForRedemption.opcaoNome,
+    rendimentoBruto: calc.rendimentoBruto,
+    penalidade: calc.penalidade,
+    valorLiquido: calc.valorTotalReceber,
+  },
+};
+
+const receiptBytes = buildReceiptBytes(receiptData);
 
       // 2. Envia para a impressora
       await printerService.printBytes(receiptBytes);
@@ -207,6 +228,9 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
         calc.valorTotalReceber,
         calc.penalidade
       );
+      if (printerService.isSimulationMode()) {
+  setPreviewReceipt(receiptData);
+}
 
       soundService.playSuccessSound();
       setRedeemStep('success');
@@ -336,6 +360,10 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
                               <div className="text-xs text-slate-600 leading-relaxed">
                                 {opt.descricaoCurta}
                               </div>
+                              <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold">
+  <Clock className="w-3.5 h-3.5" />
+  Prazo: {opt.prazoMinimoDias} {opt.prazoMinimoDias === 1 ? 'dia' : 'dias'}
+</div>
                             </div>
                           </div>
 
@@ -761,6 +789,12 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
           </div>
         )}
       </div>
+      {previewReceipt && (
+  <ReceiptPreviewModal
+    data={previewReceipt}
+    onClose={() => setPreviewReceipt(null)}
+  />
+)}
     </div>
   );
 };

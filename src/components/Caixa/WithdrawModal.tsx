@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, ArrowUpCircle, Printer, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Student } from '../../domain/types';
 import { formatQueimacash, generateProtocol, formatDateTime } from '../../utils/normalization';
-import { buildReceiptBytes } from '../../services/escpos';
+import { buildReceiptBytes, ReceiptData } from '../../services/escpos';
+import { ReceiptPreviewModal } from './ReceiptPreviewModal';
 import { printerService } from '../../services/printerService';
 import { operationRepository } from '../../repositories/operationRepository';
 import { soundService } from '../../services/soundService';
@@ -24,6 +25,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
   const [step, setStep] = useState<'input' | 'confirm' | 'printing' | 'success' | 'error'>('input');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastProtocol, setLastProtocol] = useState<string>('');
+  const [previewReceipt, setPreviewReceipt] = useState<ReceiptData | null>(null);
 
   useEffect(() => {
     async function loadPending() {
@@ -88,15 +90,17 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
 
     try {
       // 1. Gera bytes ESC/POS com destaque de OPERACAO PENDENTE
-      const receiptBytes = buildReceiptBytes({
-        tipo: 'SAQUE',
-        protocolo,
-        dataHora: dataHoraStr,
-        nomeAluno: student.nome,
-        turma: student.turma,
-        numeroConta: student.numeroConta,
-        valor,
-      });
+      const receiptData: ReceiptData = {
+  tipo: 'SAQUE',
+  protocolo,
+  dataHora: dataHoraStr,
+  nomeAluno: student.nome,
+  turma: student.turma,
+  numeroConta: student.numeroConta,
+  valor,
+};
+
+const receiptBytes = buildReceiptBytes(receiptData);
 
       // 2. Envia bytes diretamente para a impressora via Web Bluetooth
       await printerService.printBytes(receiptBytes);
@@ -111,6 +115,9 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
         tipo: 'SAQUE',
         valor,
       });
+      if (printerService.isSimulationMode()) {
+  setPreviewReceipt(receiptData);
+}
 
       soundService.playSuccessSound();
       setStep('success');
@@ -382,6 +389,12 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
           </div>
         )}
       </div>
+      {previewReceipt && (
+  <ReceiptPreviewModal
+    data={previewReceipt}
+    onClose={() => setPreviewReceipt(null)}
+  />
+)}
     </div>
   );
 };
