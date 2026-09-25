@@ -140,7 +140,12 @@ const receiptBytes = buildReceiptBytes(receiptData);
       await printerService.printBytes(receiptBytes);
 
       // 3. Efetiva aplicação imediatamente (reduz saldo e registra)
-      await investmentRepository.applyInvestment(student.id, selectedOption.id, applyAmount);
+      await investmentRepository.applyInvestment(
+  student.id,
+  selectedOption.id,
+  applyAmount,
+  protocolo
+);
       if (printerService.isSimulationMode()) {
   setPreviewReceipt(receiptData);
 }

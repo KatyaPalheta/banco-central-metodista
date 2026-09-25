@@ -1,74 +1,83 @@
-/**
- * =========================================================================
- * SERVIÇO DE AUTENTICAÇÃO MOCK TEMPORÁRIO (PROFESSOR)
- * =========================================================================
- * AVISO ARQUITETURAL IMPORTANTE:
- * Esta autenticação é estritamente temporária para esta fase de validação
- * pedagógica e testes locais. NÃO representa a solução definitiva de segurança
- * de produção (que será posteriormente integrada com Supabase Auth/RBAC).
- */
-
-const SESSION_STORAGE_KEY = 'bcem_teacher_auth_session';
-
-// Senha centralizada de teste para acesso administrativo do professor
-export const TEMPORARY_TEACHER_PASSWORD = 'metodista2026';
+import { supabase } from '../lib/supabase';
 
 export interface AuthSession {
   isAuthenticated: boolean;
-  username: string;
+  userId: string;
+  email: string;
   loginTime: string;
 }
 
 class AuthService {
-  private currentSession: AuthSession | null = null;
+  async getSession(): Promise<AuthSession | null> {
+    const { data, error } = await supabase.auth.getSession();
 
-  constructor() {
-    this.restoreSession();
-  }
-
-  private restoreSession(): void {
-    try {
-      const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
-      if (stored) {
-        this.currentSession = JSON.parse(stored);
-      }
-    } catch {
-      this.currentSession = null;
+    if (error) {
+      console.error('Erro ao recuperar sessão:', error);
+      return null;
     }
-  }
 
-  isAuthenticated(): boolean {
-    return !!this.currentSession?.isAuthenticated;
-  }
+    const session = data.session;
 
-  getSession(): AuthSession | null {
-    return this.currentSession;
-  }
-
-  async login(password: string): Promise<{ success: boolean; error?: string }> {
-    // Simula pequena latência de verificação
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    if (password === TEMPORARY_TEACHER_PASSWORD) {
-      const session: AuthSession = {
-        isAuthenticated: true,
-        username: 'Professor / Coordenação',
-        loginTime: new Date().toISOString(),
-      };
-      this.currentSession = session;
-      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-      return { success: true };
+    if (!session?.user) {
+      return null;
     }
 
     return {
-      success: false,
-      error: 'Senha incorreta. Verifique a senha temporária do projeto.',
+      isAuthenticated: true,
+      userId: session.user.id,
+      email: session.user.email ?? '',
+      loginTime: new Date().toISOString(),
     };
   }
 
-  logout(): void {
-    this.currentSession = null;
-    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  async isAuthenticated(): Promise<boolean> {
+    const session = await this.getSession();
+    return !!session?.isAuthenticated;
+  }
+
+  async login(
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error('Erro de login:', error);
+
+      return {
+        success: false,
+        error: 'E-mail ou senha inválidos.',
+      };
+    }
+
+    return {
+      success: true,
+    };
+  }
+
+  async logout(): Promise<void> {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error('Erro ao sair:', error);
+    }
+  }
+
+  onAuthStateChange(
+    callback: (authenticated: boolean) => void
+  ): () => void {
+    const { data } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        callback(!!session);
+      }
+    );
+
+    return () => {
+      data.subscription.unsubscribe();
+    };
   }
 }
 

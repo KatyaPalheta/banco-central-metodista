@@ -1,209 +1,460 @@
-import { Student, TurmaId } from '../domain/types';
-import { normalizeAccountNumber, normalizeStudentName } from '../utils/normalization';
+import { supabase } from '../lib/supabase';
 
-const STORAGE_KEY = 'bcem_students_v1';
+import {
+  Student,
+  TurmaId,
+} from '../domain/types';
 
-/**
- * Base inicial mockada de alunos para as turmas 401, 402, 501 e 502
- * Nomes armazenados rigorosamente de acordo com as regras:
- * - Todas maiúsculas
- * - Sem acentos
- * - Ç convertido para C
- * - Saldos variados para testes
- */
-const INITIAL_MOCK_STUDENTS: Student[] = [
-  // Turma 401 (Manhã)
-  { id: 'alu-401-01', nome: 'LUCAS SILVA PEREIRA', turma: '401', numeroConta: '40101', saldo: 45.0 },
-  { id: 'alu-401-02', nome: 'MARIA EDUARDA SANTOS', turma: '401', numeroConta: '40102', saldo: 120.0 },
-  { id: 'alu-401-03', nome: 'GABRIEL ALVES CONCEICAO', turma: '401', numeroConta: '40103', saldo: 20.0 },
-  { id: 'alu-401-04', nome: 'SOPHIA LIMA RODRIGUES', turma: '401', numeroConta: '40104', saldo: 75.0 },
-  { id: 'alu-401-05', nome: 'PEDRO HENRIQUE ROCHA', turma: '401', numeroConta: '40105', saldo: 10.0 },
+import {
+  normalizeAccountNumber,
+  normalizeStudentName,
+} from '../utils/normalization';
 
-  // Turma 402 (Tarde)
-  { id: 'alu-402-01', nome: 'ENZO GABRIEL FERREIRA', turma: '402', numeroConta: '40201', saldo: 35.0 },
-  { id: 'alu-402-02', nome: 'JULIA ALMEIDA COSTA', turma: '402', numeroConta: '40202', saldo: 90.0 },
-  { id: 'alu-402-03', nome: 'MATHEUS DIAS MARTINS', turma: '402', numeroConta: '40203', saldo: 15.0 },
-  { id: 'alu-402-04', nome: 'ALICE NOGUEIRA SOUSA', turma: '402', numeroConta: '40204', saldo: 60.0 },
+interface StudentRow {
+  id: string;
+  nome: string;
+  turma: string;
+  numero_conta: string;
+  saldo: number | string;
+  ativo: boolean;
+}
 
-  // Turma 501 (Manhã)
-  { id: 'alu-501-01', nome: 'JOAO PEDRO DA SILVEIRA', turma: '501', numeroConta: '50101', saldo: 150.0 },
-  { id: 'alu-501-02', nome: 'BEATRIZ FRANCA CARDOSO', turma: '501', numeroConta: '50102', saldo: 85.0 },
-  { id: 'alu-501-03', nome: 'DANIEL MOURA BARBOSA', turma: '501', numeroConta: '50103', saldo: 25.0 },
-  { id: 'alu-501-04', nome: 'LARA GONCALVES RIBEIRO', turma: '501', numeroConta: '50104', saldo: 110.0 },
-
-  // Turma 502 (Tarde)
-  { id: 'alu-502-01', nome: 'ARTHUR VIEIRA TEIXEIRA', turma: '502', numeroConta: '50201', saldo: 50.0 },
-  { id: 'alu-502-02', nome: 'VALENTINA CAMPOS LOPES', turma: '502', numeroConta: '50202', saldo: 130.0 },
-  { id: 'alu-502-03', nome: 'CAIO AZEVEDO FREITAS', turma: '502', numeroConta: '50203', saldo: 40.0 },
-  { id: 'alu-502-04', nome: 'HELENA PINTO ARAUJO', turma: '502', numeroConta: '50204', saldo: 95.0 },
-];
+const mapStudent = (
+  row: StudentRow
+): Student => ({
+  id: row.id,
+  nome: row.nome,
+  turma: row.turma as TurmaId,
+  numeroConta: row.numero_conta,
+  saldo: Number(row.saldo),
+});
 
 class StudentRepository {
-  private getStorage(): Student[] {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_MOCK_STUDENTS));
-        return INITIAL_MOCK_STUDENTS;
-      }
-      return JSON.parse(raw);
-    } catch {
-      return INITIAL_MOCK_STUDENTS;
-    }
-  }
-
-  private saveStorage(students: Student[]): void {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
-    } catch (err) {
-      console.error('Falha ao salvar dados de estudantes no localStorage', err);
-    }
-  }
 
   async getAll(): Promise<Student[]> {
-    return this.getStorage();
+    const { data, error } = await supabase
+      .from('students')
+      .select(
+        'id, nome, turma, numero_conta, saldo, ativo'
+      )
+      .eq('ativo', true)
+      .order('turma')
+      .order('nome');
+
+    if (error) {
+      console.error(
+        'Erro ao carregar alunos:',
+        error
+      );
+
+      throw new Error(
+        'Não foi possível carregar os alunos.'
+      );
+    }
+
+    return (data ?? []).map(
+      (row) => mapStudent(row as StudentRow)
+    );
   }
 
-  async getByTurma(turma?: TurmaId): Promise<Student[]> {
-    const list = this.getStorage();
-    if (!turma) return list;
-    return list.filter((s) => s.turma === turma);
+
+  async getByTurma(
+    turma?: TurmaId
+  ): Promise<Student[]> {
+
+    if (!turma) {
+      return this.getAll();
+    }
+
+    const { data, error } = await supabase
+      .from('students')
+      .select(
+        'id, nome, turma, numero_conta, saldo, ativo'
+      )
+      .eq('ativo', true)
+      .eq('turma', turma)
+      .order('nome');
+
+    if (error) {
+      console.error(
+        'Erro ao carregar turma:',
+        error
+      );
+
+      throw new Error(
+        'Não foi possível carregar a turma.'
+      );
+    }
+
+    return (data ?? []).map(
+      (row) => mapStudent(row as StudentRow)
+    );
   }
 
-  async getById(id: string): Promise<Student | null> {
-    const list = this.getStorage();
-    return list.find((s) => s.id === id) || null;
+
+  async getById(
+    id: string
+  ): Promise<Student | null> {
+
+    const { data, error } = await supabase
+      .from('students')
+      .select(
+        'id, nome, turma, numero_conta, saldo, ativo'
+      )
+      .eq('id', id)
+      .eq('ativo', true)
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        'Erro ao buscar aluno:',
+        error
+      );
+
+      throw new Error(
+        'Não foi possível buscar o aluno.'
+      );
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return mapStudent(
+      data as StudentRow
+    );
   }
 
-  async getByAccountNumber(accountNumber: string): Promise<Student | null> {
-    const norm = normalizeAccountNumber(accountNumber);
-    if (!norm) return null;
-    const list = this.getStorage();
-    return list.find((s) => normalizeAccountNumber(s.numeroConta) === norm) || null;
+
+  async getByAccountNumber(
+    accountNumber: string
+  ): Promise<Student | null> {
+
+    const normalizedAccount =
+      normalizeAccountNumber(accountNumber);
+
+    if (!normalizedAccount) {
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('students')
+      .select(
+        'id, nome, turma, numero_conta, saldo, ativo'
+      )
+      .eq(
+        'numero_conta',
+        normalizedAccount
+      )
+      .eq('ativo', true)
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        'Erro ao buscar conta:',
+        error
+      );
+
+      throw new Error(
+        'Não foi possível buscar a conta.'
+      );
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return mapStudent(
+      data as StudentRow
+    );
   }
 
-  /**
-   * Busca por Turma + Nome (aceita pesquisa parcial, sem acento, maiúsculas/minúsculas)
-   */
-  async searchByTurmaAndName(turma: TurmaId, nameQuery: string): Promise<Student[]> {
-    const normQuery = normalizeStudentName(nameQuery);
-    if (!normQuery) return [];
-    const list = this.getStorage();
-    return list.filter((s) => s.turma === turma && s.nome.includes(normQuery));
+
+  async searchByTurmaAndName(
+    turma: TurmaId,
+    nameQuery: string
+  ): Promise<Student[]> {
+
+    const normalizedQuery =
+      normalizeStudentName(nameQuery);
+
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('students')
+      .select(
+        'id, nome, turma, numero_conta, saldo, ativo'
+      )
+      .eq('ativo', true)
+      .eq('turma', turma)
+      .ilike(
+        'nome_normalizado',
+        `%${normalizedQuery}%`
+      )
+      .order('nome');
+
+    if (error) {
+      console.error(
+        'Erro ao pesquisar aluno:',
+        error
+      );
+
+      throw new Error(
+        'Não foi possível pesquisar alunos.'
+      );
+    }
+
+    return (data ?? []).map(
+      (row) => mapStudent(row as StudentRow)
+    );
   }
 
-  /**
-   * Adiciona aluno manualmente
-   */
+
+  private async createStudentRecord(
+    nome: string,
+    turma: TurmaId,
+    numeroConta: string
+  ): Promise<{
+    success: boolean;
+    id?: string;
+    error?: string;
+  }> {
+
+    const { data, error } =
+      await supabase.rpc(
+        'create_student',
+        {
+          p_nome: nome,
+          p_nome_normalizado: nome,
+          p_turma: turma,
+          p_numero_conta: numeroConta,
+        }
+      );
+
+    if (error) {
+      console.error(
+        'Erro ao cadastrar aluno:',
+        error
+      );
+
+      if (
+        error.code === '23505' ||
+        error.message
+          .toLowerCase()
+          .includes('duplicate')
+      ) {
+        return {
+          success: false,
+          error:
+            `A conta ${numeroConta} já está cadastrada.`,
+        };
+      }
+
+      return {
+        success: false,
+        error:
+          'Não foi possível cadastrar o aluno.',
+      };
+    }
+
+    return {
+      success: true,
+      id: String(data),
+    };
+  }
+
+
   async addStudent(data: {
     nome: string;
     turma: TurmaId;
     numeroConta: string;
-  }): Promise<{ success: boolean; student?: Student; error?: string }> {
-    const list = this.getStorage();
-    const normalizedName = normalizeStudentName(data.nome);
-    const normalizedAccount = normalizeAccountNumber(data.numeroConta);
+  }): Promise<{
+    success: boolean;
+    student?: Student;
+    error?: string;
+  }> {
+
+    const normalizedName =
+      normalizeStudentName(data.nome);
+
+    const normalizedAccount =
+      normalizeAccountNumber(
+        data.numeroConta
+      );
 
     if (!normalizedName) {
-      return { success: false, error: 'O nome do aluno é obrigatório.' };
+      return {
+        success: false,
+        error:
+          'O nome do aluno é obrigatório.',
+      };
     }
+
     if (!normalizedAccount) {
-      return { success: false, error: 'O número da conta é obrigatório.' };
+      return {
+        success: false,
+        error:
+          'O número da conta é obrigatório.',
+      };
     }
 
-    const accountExists = list.some(
-      (s) => normalizeAccountNumber(s.numeroConta) === normalizedAccount
-    );
-    if (accountExists) {
-      return { success: false, error: `A conta ${normalizedAccount} já está cadastrada.` };
+    const result =
+      await this.createStudentRecord(
+        normalizedName,
+        data.turma,
+        normalizedAccount
+      );
+
+    if (!result.success || !result.id) {
+      return {
+        success: false,
+        error: result.error,
+      };
     }
 
-    const newStudent: Student = {
-      id: `alu-${data.turma}-${Date.now().toString(36)}`,
-      nome: normalizedName,
-      turma: data.turma,
-      numeroConta: normalizedAccount,
-      saldo: 0, // Novos alunos iniciam sempre com saldo zero
+    const student =
+      await this.getById(result.id);
+
+    if (!student) {
+      return {
+        success: false,
+        error:
+          'Aluno cadastrado, mas não foi possível recarregá-lo.',
+      };
+    }
+
+    return {
+      success: true,
+      student,
     };
-
-    list.push(newStudent);
-    this.saveStorage(list);
-    return { success: true, student: newStudent };
   }
 
-  /**
-   * Importação em lote a partir do Excel
-   */
+
   async importBatch(
     turma: TurmaId,
-    records: Array<{ nome: string; numeroConta: string }>
-  ): Promise<{ addedCount: number; errors: string[] }> {
-    const list = this.getStorage();
+    records: Array<{
+      nome: string;
+      numeroConta: string;
+    }>
+  ): Promise<{
+    addedCount: number;
+    errors: string[];
+  }> {
+
     const errors: string[] = [];
     let addedCount = 0;
 
-    const existingAccounts = new Set(list.map((s) => normalizeAccountNumber(s.numeroConta)));
+    const existingStudents =
+      await this.getAll();
+
+    const existingAccounts =
+      new Set(
+        existingStudents.map(
+          (student) =>
+            normalizeAccountNumber(
+              student.numeroConta
+            )
+        )
+      );
 
     for (const item of records) {
-      const normName = normalizeStudentName(item.nome);
-      const normAcc = normalizeAccountNumber(item.numeroConta);
 
-      if (!normName || !normAcc) {
-        errors.push(`Registro inválido ignorado: "${item.nome}" - "${item.numeroConta}"`);
+      const normalizedName =
+        normalizeStudentName(
+          item.nome
+        );
+
+      const normalizedAccount =
+        normalizeAccountNumber(
+          item.numeroConta
+        );
+
+      if (
+        !normalizedName ||
+        !normalizedAccount
+      ) {
+        errors.push(
+          `Registro inválido ignorado: "${item.nome}" - "${item.numeroConta}"`
+        );
+
         continue;
       }
 
-      if (existingAccounts.has(normAcc)) {
-        errors.push(`Conta duplicada ignorada: ${normAcc} (${normName})`);
+      if (
+        existingAccounts.has(
+          normalizedAccount
+        )
+      ) {
+        errors.push(
+          `Conta duplicada ignorada: ${normalizedAccount} (${normalizedName})`
+        );
+
         continue;
       }
 
-      existingAccounts.add(normAcc);
-      const newStudent: Student = {
-        id: `alu-${turma}-${Date.now().toString(36)}-${addedCount}`,
-        nome: normName,
-        turma,
-        numeroConta: normAcc,
-        saldo: 0,
-      };
-      list.push(newStudent);
+      const result =
+        await this.createStudentRecord(
+          normalizedName,
+          turma,
+          normalizedAccount
+        );
+
+      if (!result.success) {
+        errors.push(
+          `${normalizedName}: ${
+            result.error ??
+            'Erro ao cadastrar.'
+          }`
+        );
+
+        continue;
+      }
+
+      existingAccounts.add(
+        normalizedAccount
+      );
+
       addedCount++;
     }
 
-    if (addedCount > 0) {
-      this.saveStorage(list);
-    }
-
-    return { addedCount, errors };
+    return {
+      addedCount,
+      errors,
+    };
   }
 
+
   /**
-   * Atualiza o saldo confirmado de um aluno (somando ou subtraindo)
+   * O saldo não pode mais ser alterado
+   * diretamente pelo navegador.
+   *
+   * Depósitos, saques, investimentos
+   * e resgates usam as funções
+   * financeiras do Supabase.
    */
-  async updateBalance(studentId: string, delta: number): Promise<Student> {
-    const list = this.getStorage();
-    const index = list.findIndex((s) => s.id === studentId);
-    if (index === -1) {
-      throw new Error(`Estudante ID ${studentId} não encontrado.`);
-    }
+  async updateBalance(
+    _studentId: string,
+    _delta: number
+  ): Promise<Student> {
 
-    const currentSaldo = list[index].saldo;
-    const novoSaldo = Number((currentSaldo + delta).toFixed(2));
-    if (novoSaldo < 0) {
-      throw new Error(`Saldo insuficiente para realizar a operação.`);
-    }
-
-    list[index] = { ...list[index], saldo: novoSaldo };
-    this.saveStorage(list);
-    return list[index];
+    throw new Error(
+      'Alteração direta de saldo desativada. Use as funções financeiras do Supabase.'
+    );
   }
 
+
   /**
-   * Restaura dados iniciais (útil para testes)
+   * A base oficial não utiliza mais
+   * alunos mockados em localStorage.
    */
   resetToDefault(): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_MOCK_STUDENTS));
+    console.warn(
+      'resetToDefault desativado: os alunos agora estão armazenados no Supabase.'
+    );
   }
 }
 
-export const studentRepository = new StudentRepository();
+export const studentRepository =
+  new StudentRepository();
