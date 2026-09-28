@@ -113,8 +113,8 @@ const patrimonioTotal = Number(
               Olá, {student.nome}!
             </h1>
             <p className="text-slate-600 text-sm font-semibold mt-0.5">
-              Turma {student.turma} ({student.turma.endsWith('1') ? 'Turno da Manhã' : 'Turno da Tarde'})
-            </p>
+  Turma {student.turma}
+</p>
           </div>
 
           <button

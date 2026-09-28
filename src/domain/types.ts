@@ -1,4 +1,4 @@
-export type TurmaId = '401' | '402' | '501' | '502';
+export type TurmaId = string;
 
 export interface Student {
   id: string;

@@ -56,11 +56,9 @@ export const StudentConfirm: React.FC<StudentConfirmProps> = ({
                 Turma
               </span>
               <div className="font-fredoka text-lg font-bold text-blue-700">
-                Turma {student.turma}
-                <span className="text-xs font-nunito font-semibold text-slate-600 ml-1">
-                  ({student.turma.endsWith('1') ? 'Manhã' : 'Tarde'})
-                </span>
-              </div>
+  Turma {student.turma}
+</div>
+              
             </div>
 
             <div>

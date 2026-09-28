@@ -1,57 +1,243 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Search, UserCheck, Hash, GraduationCap, ArrowRight } from 'lucide-react';
 import { Student, TurmaId } from '../../domain/types';
 import { studentRepository } from '../../repositories/studentRepository';
+import {
+  turmaRepository,
+  Turma,
+} from '../../repositories/turmaRepository';
 import { soundService } from '../../services/soundService';
+import { authService } from '../../services/authService';
 
 interface StudentSearchProps {
   onStudentSelected: (student: Student) => void;
 }
 
-export const StudentSearch: React.FC<StudentSearchProps> = ({ onStudentSelected }) => {
+export const StudentSearch: React.FC<StudentSearchProps> = ({
+  onStudentSelected,
+}) => {
   const [searchMode, setSearchMode] = useState<'account' | 'turmaName'>('account');
   const [accountInput, setAccountInput] = useState('');
-  const [selectedTurma, setSelectedTurma] = useState<TurmaId>('401');
+  const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [selectedTurma, setSelectedTurma] = useState<TurmaId>('');
   const [nameInput, setNameInput] = useState('');
   const [searchResults, setSearchResults] = useState<Student[]>([]);
   const [searched, setSearched] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [searching, setSearching] = useState(false);
+
+  const authenticatedRef = useRef(false);
+  const requestVersion = useRef(0);
+
+  useEffect(() => {
+    let mounted = true;
+    let authEventReceived = false;
+
+    const applyAuthentication = (authenticated: boolean) => {
+      if (!mounted) return;
+
+      authenticatedRef.current = authenticated;
+      setIsAuthenticated(authenticated);
+      setCheckingAuth(false);
+
+      if (!authenticated) {
+        requestVersion.current += 1;
+        setSearchResults([]);
+        setSearched(false);
+        setSearching(false);
+        setErrorMsg(null);
+      }
+    };
+
+    const unsubscribe = authService.onAuthStateChange((authenticated) => {
+      authEventReceived = true;
+      applyAuthentication(authenticated);
+    });
+
+    const checkSession = async () => {
+      try {
+        const authenticated = await authService.isAuthenticated();
+
+        if (!authEventReceived) {
+          applyAuthentication(authenticated);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar sessão do professor:', error);
+
+        if (!authEventReceived) {
+          applyAuthentication(false);
+        }
+      }
+    };
+
+    void checkSession();
+
+    return () => {
+      mounted = false;
+      authenticatedRef.current = false;
+      requestVersion.current += 1;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (checkingAuth || !isAuthenticated) return;
+
+    let mounted = true;
+
+    const loadTurmas = async () => {
+      try {
+        const turmasCadastradas = await turmaRepository.getAll();
+
+        if (!mounted) return;
+
+        setTurmas(turmasCadastradas);
+        setSelectedTurma((current) =>
+          turmasCadastradas.some((turma) => turma.codigo === current)
+            ? current
+            : (turmasCadastradas[0]?.codigo ?? '')
+        );
+      } catch (error) {
+        if (!mounted) return;
+
+        console.error('Erro ao carregar turmas:', error);
+        setErrorMsg('Não foi possível carregar as turmas.');
+      }
+    };
+
+    void loadTurmas();
+
+    return () => {
+      mounted = false;
+    };
+  }, [checkingAuth, isAuthenticated]);
+
+  const searchDisabled = checkingAuth || !isAuthenticated || searching;
+
+  const searchButtonClassName = `
+    w-full py-4 px-6 rounded-2xl
+    font-fredoka font-bold text-lg sm:text-xl
+    shadow-lg transition-all flex items-center justify-center gap-3
+    ${
+      searchDisabled
+        ? 'bg-slate-300 text-slate-500 shadow-slate-200/30 cursor-not-allowed'
+        : 'bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white shadow-emerald-600/20 cursor-pointer'
+    }
+  `;
 
   const handleSearchByAccount = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (searchDisabled || !authenticatedRef.current) return;
+
     setErrorMsg(null);
+    setSearchResults([]);
     setSearched(true);
+
     if (!accountInput.trim()) {
       setErrorMsg('Por favor, digite o número da conta.');
       return;
     }
 
-    const found = await studentRepository.getByAccountNumber(accountInput);
-    if (found) {
-      soundService.playNoteSound(20);
-      onStudentSelected(found);
-    } else {
-      setErrorMsg(`Conta "${accountInput.trim()}" não encontrada. Verifique com seu professor.`);
-      setSearchResults([]);
+    const currentRequest = ++requestVersion.current;
+    setSearching(true);
+
+    try {
+      const found = await studentRepository.getByAccountNumber(accountInput);
+
+      if (
+        !authenticatedRef.current ||
+        currentRequest !== requestVersion.current
+      ) {
+        return;
+      }
+
+      if (found) {
+        soundService.playNoteSound(20);
+        onStudentSelected(found);
+      } else {
+        setErrorMsg(
+          `Conta "${accountInput.trim()}" não encontrada. Verifique com seu professor.`
+        );
+      }
+    } catch (error) {
+      if (
+        !authenticatedRef.current ||
+        currentRequest !== requestVersion.current
+      ) {
+        return;
+      }
+
+      console.error('Erro ao localizar conta:', error);
+      setErrorMsg('Não foi possível localizar a conta. Tente novamente.');
+    } finally {
+      if (currentRequest === requestVersion.current) {
+        setSearching(false);
+      }
     }
   };
 
   const handleSearchByTurmaAndName = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (searchDisabled || !authenticatedRef.current) return;
+
     setErrorMsg(null);
+    setSearchResults([]);
     setSearched(true);
+
+    if (!selectedTurma) {
+      setErrorMsg('Nenhuma turma está disponível para busca.');
+      return;
+    }
+
     if (!nameInput.trim()) {
       setErrorMsg('Digite pelo menos parte do seu nome.');
       return;
     }
 
-    const results = await studentRepository.searchByTurmaAndName(selectedTurma, nameInput);
-    setSearchResults(results);
-    if (results.length === 0) {
-      setErrorMsg(`Nenhum aluno encontrado na Turma ${selectedTurma} com o nome "${nameInput}".`);
-    } else if (results.length === 1) {
-      soundService.playNoteSound(20);
-      onStudentSelected(results[0]);
+    const currentRequest = ++requestVersion.current;
+    setSearching(true);
+
+    try {
+      const results = await studentRepository.searchByTurmaAndName(
+        selectedTurma,
+        nameInput
+      );
+
+      if (
+        !authenticatedRef.current ||
+        currentRequest !== requestVersion.current
+      ) {
+        return;
+      }
+
+      setSearchResults(results);
+
+      if (results.length === 0) {
+        setErrorMsg(
+          `Nenhum aluno encontrado na Turma ${selectedTurma} com o nome "${nameInput}".`
+        );
+      } else if (results.length === 1) {
+        soundService.playNoteSound(20);
+        onStudentSelected(results[0]);
+      }
+    } catch (error) {
+      if (
+        !authenticatedRef.current ||
+        currentRequest !== requestVersion.current
+      ) {
+        return;
+      }
+
+      console.error('Erro ao buscar aluno:', error);
+      setErrorMsg('Não foi possível buscar o aluno. Tente novamente.');
+    } finally {
+      if (currentRequest === requestVersion.current) {
+        setSearching(false);
+      }
     }
   };
 
@@ -76,9 +262,12 @@ export const StudentSearch: React.FC<StudentSearchProps> = ({ onStudentSelected 
         <button
           type="button"
           onClick={() => {
+            requestVersion.current += 1;
+            setSearching(false);
             setSearchMode('account');
             setErrorMsg(null);
             setSearched(false);
+            setSearchResults([]);
           }}
           className={`py-3 px-4 rounded-xl font-bold text-sm sm:text-base transition-all flex items-center justify-center gap-2 cursor-pointer ${
             searchMode === 'account'
@@ -93,9 +282,12 @@ export const StudentSearch: React.FC<StudentSearchProps> = ({ onStudentSelected 
         <button
           type="button"
           onClick={() => {
+            requestVersion.current += 1;
+            setSearching(false);
             setSearchMode('turmaName');
             setErrorMsg(null);
             setSearched(false);
+            setSearchResults([]);
           }}
           className={`py-3 px-4 rounded-xl font-bold text-sm sm:text-base transition-all flex items-center justify-center gap-2 cursor-pointer ${
             searchMode === 'turmaName'
@@ -131,7 +323,8 @@ export const StudentSearch: React.FC<StudentSearchProps> = ({ onStudentSelected 
 
           <button
             type="submit"
-            className="w-full py-4 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-fredoka font-bold text-lg sm:text-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-3 cursor-pointer"
+            disabled={searchDisabled}
+            className={searchButtonClassName}
           >
             <Search className="w-5 h-5" />
             LOCALIZAR MINHA CONTA
@@ -145,33 +338,28 @@ export const StudentSearch: React.FC<StudentSearchProps> = ({ onStudentSelected 
           onSubmit={handleSearchByTurmaAndName}
           className="bg-white/90 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-sky-100 shadow-xl shadow-sky-900/5"
         >
-          {/* Seleção de Turma */}
           <div className="mb-6">
             <label className="block text-slate-700 font-bold text-sm mb-2">
               1. Selecione a sua turma:
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {(['401', '402', '501', '502'] as TurmaId[]).map((turma) => (
+              {turmas.map((turma) => (
                 <button
-                  key={turma}
+                  key={turma.codigo}
                   type="button"
-                  onClick={() => setSelectedTurma(turma)}
+                  onClick={() => setSelectedTurma(turma.codigo)}
                   className={`py-3 px-3 rounded-2xl font-fredoka text-lg font-bold transition-all cursor-pointer ${
-                    selectedTurma === turma
+                    selectedTurma === turma.codigo
                       ? 'bg-blue-600 text-white shadow-md ring-3 ring-blue-200'
                       : 'bg-sky-50 text-slate-700 hover:bg-sky-100 border border-sky-200'
                   }`}
                 >
-                  Turma {turma}
-                  <span className="block text-[11px] font-nunito font-semibold opacity-80">
-                    {turma.endsWith('1') ? 'Manhã' : 'Tarde'}
-                  </span>
+                  Turma {turma.codigo}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Nome do Aluno */}
           <div className="mb-6">
             <label className="block text-slate-700 font-bold text-sm mb-2">
               2. Digite seu primeiro nome ou nome completo:
@@ -189,7 +377,8 @@ export const StudentSearch: React.FC<StudentSearchProps> = ({ onStudentSelected 
 
           <button
             type="submit"
-            className="w-full py-4 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-fredoka font-bold text-lg sm:text-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-3 cursor-pointer"
+            disabled={searchDisabled}
+            className={searchButtonClassName}
           >
             <Search className="w-5 h-5" />
             BUSCAR ALUNO
@@ -197,15 +386,14 @@ export const StudentSearch: React.FC<StudentSearchProps> = ({ onStudentSelected 
         </form>
       )}
 
-      {/* Alertas de erro */}
       {errorMsg && (
         <div className="mt-4 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-bold text-center">
           {errorMsg}
         </div>
       )}
 
-      {/* Lista de Alunos Encontrados (SEMPRE SEM EXIBIR SALDO!) */}
-      {searched && searchResults.length > 1 && (
+      {/* Lista de Alunos Encontrados, sem exibir saldo */}
+      {isAuthenticated && searched && searchResults.length > 1 && (
         <div className="mt-6 bg-white/90 backdrop-blur-md rounded-3xl p-6 border border-sky-100 shadow-lg">
           <h3 className="font-fredoka text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
             <UserCheck className="w-5 h-5 text-blue-600" />
@@ -217,6 +405,8 @@ export const StudentSearch: React.FC<StudentSearchProps> = ({ onStudentSelected 
                 key={student.id}
                 type="button"
                 onClick={() => {
+                  if (!authenticatedRef.current) return;
+
                   soundService.playNoteSound(20);
                   onStudentSelected(student);
                 }}
@@ -227,7 +417,7 @@ export const StudentSearch: React.FC<StudentSearchProps> = ({ onStudentSelected 
                     {student.nome}
                   </div>
                   <div className="text-xs text-slate-500 font-semibold">
-                    Turma {student.turma} ({student.turma.endsWith('1') ? 'Manhã' : 'Tarde'}) · Conta nº {student.numeroConta}
+                    Turma {student.turma} · Conta nº {student.numeroConta}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 text-blue-600 font-bold text-sm">

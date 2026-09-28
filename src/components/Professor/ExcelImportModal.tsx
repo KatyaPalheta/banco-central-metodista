@@ -74,7 +74,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
               Importar Turma via Excel
             </h3>
             <p className="text-xs text-slate-500">
-              Arquivos no formato: 401.xlsx, 402.xlsx, 501.xlsx, 502.xlsx
+              Use o código da turma no nome do arquivo (ex: 403.xlsx)
             </p>
           </div>
         </div>
@@ -84,6 +84,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
           <p><strong>Regras oficiais de importação:</strong></p>
           <ul className="list-disc list-inside space-y-0.5 text-sky-800">
             <li>O nome do arquivo define a turma (ex: <strong>401.xlsx</strong>).</li>
+            <li>A turma precisa estar cadastrada no sistema antes da importação.</li>
             <li>Colunas obrigatórias: <strong>ALUNO</strong> e <strong>NUMERO DE CONTA</strong>.</li>
             <li>Nomes serão normalizados automaticamente (maiúsculas, sem acentos, Ç vira C).</li>
             <li>Novos alunos importados iniciam sempre com saldo zero.</li>
@@ -99,7 +100,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                 Clique para selecionar a planilha (.xlsx)
               </span>
               <span className="text-xs text-slate-500">
-                Arquivos suportados: 401.xlsx, 402.xlsx, 501.xlsx, 502.xlsx
+                O arquivo deve usar o código de uma turma já cadastrada
               </span>
               <input
                 type="file"

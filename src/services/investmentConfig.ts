@@ -1,55 +1,65 @@
-import { InvestmentOptionConfig, InvestmentOptionId, InvestmentRecord } from '../domain/types';
+import {
+  InvestmentOptionConfig,
+  InvestmentOptionId,
+  InvestmentRecord,
+} from '../domain/types';
 
 /**
- * =========================================================================
- * CONFIGURAÇÃO CENTRALIZADA DOS INVESTIMENTOS (PARÂMETROS TEMPORÁRIOS DE TESTE)
- * =========================================================================
- * ATENÇÃO: Os valores, prazos e taxas abaixo são parâmetros temporários
- * apenas para permitir o teste pedagógico e validação do fluxo do sistema.
- * Podem ser ajustados livremente sem necessidade de alterar as telas.
+ * Taxas para novas aplicações:
+ * Opção 1: 1% em 1 dia.
+ * Opção 2: 8% em 7 dias, com devolução automática.
+ * Opção 3: 36% por ciclo de 30 dias, com renovação automática.
  */
-export const INVESTMENT_CONFIGS: Record<InvestmentOptionId, InvestmentOptionConfig> = {
+export const INVESTMENT_CONFIGS: Record<
+  InvestmentOptionId,
+  InvestmentOptionConfig
+> = {
   OPCAO_1: {
     id: 'OPCAO_1',
     nome: 'Opção 1 - Cofrinho Livre',
-    descricaoCurta: 'Menor rendimento, resgate a qualquer momento sem penalidade.',
-    detalhesRegra: 'Ideal para quem pode precisar do Queimacash logo. Você pode resgatar a qualquer momento e receber o rendimento proporcional sem nenhum desconto.',
-    rendimentoTaxaPercentual: 5, // 5% de rendimento (parâmetro de teste)
-    prazoMinimoDias: 1, // Resgate livre imediato
+    descricaoCurta:
+      'Menor rendimento, resgate a qualquer momento sem penalidade.',
+    detalhesRegra:
+      'Ideal para quem pode precisar do Queimacash logo. Você pode resgatar a qualquer momento e receber o rendimento acumulado sem desconto. Após o prazo de 1 dia, o investimento deixa de render e permanece aplicado até você solicitar o resgate.',
+    rendimentoTaxaPercentual: 1,
+    prazoMinimoDias: 1,
     permiteResgateAntecipado: true,
-    penalidadeAntecipadaPercentual: 0, // Sem penalidade
+    penalidadeAntecipadaPercentual: 0,
     corDestaque: 'emerald',
     icone: 'Sprout',
   },
+
   OPCAO_2: {
     id: 'OPCAO_2',
     nome: 'Opção 2 - Prazo Determinado',
-    descricaoCurta: 'Rendimento maior com prazo fixo. O valor fica guardado até o vencimento.',
-    detalhesRegra: 'Para quem planeja guardar por um tempo determinado. O resgate fica bloqueado até o vencimento para garantir o rendimento maior.',
-    rendimentoTaxaPercentual: 10, // 12% de rendimento (parâmetro de teste)
-    prazoMinimoDias: 7, // 30 dias de prazo fixo (para teste)
-    permiteResgateAntecipado: false, // Não permite antes do vencimento
+    descricaoCurta:
+      'Fica guardado por 7 dias. No vencimento, o valor e os juros voltam automaticamente para a conta.',
+    detalhesRegra:
+      'O resgate fica bloqueado durante os 7 dias. No processamento automático do vencimento, o valor investido e os juros são creditados no saldo da conta, e o investimento é encerrado. Não é necessária confirmação do professor para essa devolução.',
+    rendimentoTaxaPercentual: 8,
+    prazoMinimoDias: 7,
+    permiteResgateAntecipado: false,
     penalidadeAntecipadaPercentual: 0,
     corDestaque: 'amber',
     icone: 'Clock',
   },
+
   OPCAO_3: {
     id: 'OPCAO_3',
     nome: 'Opção 3 - Longo Prazo com Flexibilidade',
-    descricaoCurta: 'Maior rendimento com prazo longo. Permite resgate antes com taxa de penalidade.',
-    detalhesRegra: 'Para quem busca o maior crescimento possível. Se precisar retirar antes do prazo final, o sistema calcula uma penalidade sobre o rendimento.',
-    rendimentoTaxaPercentual: 20, // 20% de rendimento no vencimento (parâmetro de teste)
-    prazoMinimoDias: 30, // 60 dias de prazo total
-    permiteResgateAntecipado: true, // Permite antecipado
-    penalidadeAntecipadaPercentual: 50, // Penalidade de 50% sobre o rendimento acumulado se resgatar antes
+    descricaoCurta:
+      'A cada 30 dias, os juros se somam ao valor investido e começa um novo ciclo.',
+    detalhesRegra:
+      'Durante cada ciclo de 30 dias, os juros ficam acumulados separadamente. No processamento do vencimento, eles são incorporados ao valor investido e o acumulado de juros é zerado. O novo ciclo rende sobre esse valor maior. Se você resgatar antes do próximo vencimento, a penalidade é de 50% somente sobre os juros acumulados no ciclo atual. Os juros incorporados nos ciclos anteriores fazem parte do valor investido e não recebem essa penalidade.',
+    rendimentoTaxaPercentual: 36,
+    prazoMinimoDias: 30,
+    permiteResgateAntecipado: true,
+    penalidadeAntecipadaPercentual: 50,
     corDestaque: 'purple',
     icone: 'TrendingUp',
   },
 };
 
-/**
- * Retorna a lista das 3 opções de investimento
- */
 export function getAvailableInvestmentOptions(): InvestmentOptionConfig[] {
   return [
     INVESTMENT_CONFIGS.OPCAO_1,
@@ -59,8 +69,8 @@ export function getAvailableInvestmentOptions(): InvestmentOptionConfig[] {
 }
 
 /**
- * Calcula o valor de resgate e eventuais rendimentos/penalidades
- * baseado na data atual e nas regras do produto
+ * Prévia calculada com o rendimento acumulado recebido do Supabase.
+ * O valor definitivo do resgate é calculado pela função SQL.
  */
 export function calculateRedemption(investment: InvestmentRecord): {
   podeResgatar: boolean;
@@ -74,58 +84,74 @@ export function calculateRedemption(investment: InvestmentRecord): {
   const config = INVESTMENT_CONFIGS[investment.opcaoId];
 
   const now = new Date();
-  const dataAplicacao = new Date(investment.dataAplicacao);
   const dataVencimento = new Date(investment.dataVencimento);
+  const isAntecipado = now < dataVencimento;
 
-  const isVencido = now >= dataVencimento;
-  const isAntecipado = !isVencido;
+  const rendimentoBruto = investment.rendimentoAcumulado;
 
-  // Modalidades bloqueadas não podem ser resgatadas antes do vencimento
-  if (isAntecipado && !config.permiteResgateAntecipado) {
+  const totalSemPenalidade = Number(
+    (investment.valorAplicado + rendimentoBruto).toFixed(2)
+  );
+
+  if (investment.status !== 'ATIVO') {
     return {
       podeResgatar: false,
-      motivoBloqueio: `Esta modalidade tem prazo fixo. O valor estará disponível para resgate a partir de ${dataVencimento.toLocaleDateString('pt-BR')}.`,
-      isAntecipado: true,
-      rendimentoBruto: 0,
-      penalidade: 0,
-      rendimentoLiquido: 0,
-      valorTotalReceber: investment.valorAplicado,
+      motivoBloqueio:
+        'Este investimento não está disponível para uma nova solicitação de resgate.',
+      isAntecipado,
+      rendimentoBruto,
+      penalidade: investment.penalidadeAplicada,
+      rendimentoLiquido: Number(
+        (rendimentoBruto - investment.penalidadeAplicada).toFixed(2)
+      ),
+      valorTotalReceber: investment.valorResgateCalculado,
     };
   }
 
-  const MS_POR_DIA = 24 * 60 * 60 * 1000;
+  // Na opção 2, a devolução é sempre automática no vencimento.
+  if (investment.opcaoId === 'OPCAO_2') {
+    return {
+      podeResgatar: false,
+      motivoBloqueio: isAntecipado
+        ? `O valor investido e os juros voltarão automaticamente ao saldo no processamento do vencimento, em ${dataVencimento.toLocaleDateString('pt-BR')}. Não é necessária confirmação do professor.`
+        : 'O prazo terminou. O investimento aguarda a devolução automática do valor e dos juros ao saldo da conta. Consulte novamente após o processamento.',
+      isAntecipado,
+      rendimentoBruto,
+      penalidade: 0,
+      rendimentoLiquido: rendimentoBruto,
+      valorTotalReceber: totalSemPenalidade,
+    };
+  }
 
-  const totalDias = Math.max(
-    1,
-    Math.round(
-      (dataVencimento.getTime() - dataAplicacao.getTime()) / MS_POR_DIA
-    )
-  );
+  // Não apresenta resgate com dados do ciclo anterior.
+  if (investment.opcaoId === 'OPCAO_3' && !isAntecipado) {
+    return {
+      podeResgatar: false,
+      motivoBloqueio:
+        'Este ciclo terminou e aguarda a renovação automática. Os juros serão incorporados ao valor investido e um novo ciclo de 30 dias começará. Consulte novamente após o processamento.',
+      isAntecipado: false,
+      rendimentoBruto,
+      penalidade: 0,
+      rendimentoLiquido: rendimentoBruto,
+      valorTotalReceber: totalSemPenalidade,
+    };
+  }
 
-  const diasDecorridos = Math.max(
-    0,
-    Math.floor(
-      (now.getTime() - dataAplicacao.getTime()) / MS_POR_DIA
-    )
-  );
-
-  // Nunca rende além do prazo contratado
-  const diasConsiderados = Math.min(diasDecorridos, totalDias);
-
-  const proporcaoTempo = diasConsiderados / totalDias;
-
-  // Rendimento máximo somente no vencimento
-  const rendimentoNoVencimento =
-    (investment.valorAplicado * config.rendimentoTaxaPercentual) / 100;
-
-  // Quanto realmente foi ganho até hoje
-  const rendimentoBruto = Number(
-    (rendimentoNoVencimento * proporcaoTempo).toFixed(2)
-  );
+  if (isAntecipado && !config.permiteResgateAntecipado) {
+    return {
+      podeResgatar: false,
+      motivoBloqueio:
+        `Esta modalidade não permite resgate antes de ${dataVencimento.toLocaleDateString('pt-BR')}.`,
+      isAntecipado: true,
+      rendimentoBruto,
+      penalidade: 0,
+      rendimentoLiquido: rendimentoBruto,
+      valorTotalReceber: totalSemPenalidade,
+    };
+  }
 
   let penalidade = 0;
 
-  // Penalidade somente sobre o rendimento já acumulado
   if (
     isAntecipado &&
     config.penalidadeAntecipadaPercentual > 0
@@ -139,11 +165,15 @@ export function calculateRedemption(investment: InvestmentRecord): {
   }
 
   const rendimentoLiquido = Number(
-    Math.max(0, rendimentoBruto - penalidade).toFixed(2)
+    (rendimentoBruto - penalidade).toFixed(2)
   );
 
   const valorTotalReceber = Number(
-    (investment.valorAplicado + rendimentoLiquido).toFixed(2)
+    (
+      investment.valorAplicado +
+      rendimentoBruto -
+      penalidade
+    ).toFixed(2)
   );
 
   return {

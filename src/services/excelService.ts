@@ -2,8 +2,8 @@ import * as XLSX from 'xlsx';
 import { ImportSummary, TurmaId } from '../domain/types';
 import { normalizeAccountNumber, normalizeStudentName } from '../utils/normalization';
 import { studentRepository } from '../repositories/studentRepository';
+import { turmaRepository } from '../repositories/turmaRepository';
 
-const VALID_TURMAS: TurmaId[] = ['401', '402', '501', '502'];
 
 /**
  * Analisa o arquivo Excel (.xlsx) selecionado e produz um resumo antes da efetivação
@@ -13,11 +13,22 @@ export async function parseExcelImport(file: File): Promise<ImportSummary> {
   // Extrai nome sem extensão
   const baseName = fileName.replace(/\.[^/.]+$/, '').trim();
 
-  // Valida turma pelo nome do arquivo
-  let turmaIdentificada: TurmaId | null = null;
-  if (VALID_TURMAS.includes(baseName as TurmaId)) {
-    turmaIdentificada = baseName as TurmaId;
+// Valida turma pelo nome do arquivo e pelas turmas cadastradas
+let turmaIdentificada: TurmaId | null = null;
+
+const codigoValido = /^\d{3}$/.test(baseName);
+
+if (codigoValido) {
+  const turmasCadastradas = await turmaRepository.getAll();
+
+  const turmaExiste = turmasCadastradas.some(
+    (turma) => turma.codigo === baseName
+  );
+
+  if (turmaExiste) {
+    turmaIdentificada = baseName;
   }
+}
 
   const summary: ImportSummary = {
     turmaIdentificada,
@@ -28,11 +39,18 @@ export async function parseExcelImport(file: File): Promise<ImportSummary> {
   };
 
   if (!turmaIdentificada) {
+  if (!codigoValido) {
     summary.erros.push(
-      `O nome do arquivo "${fileName}" não corresponde a uma turma válida. Utilize 401.xlsx, 402.xlsx, 501.xlsx ou 502.xlsx.`
+      `O nome do arquivo "${fileName}" deve ser o código da turma com 3 números. Exemplo: 403.xlsx.`
     );
-    return summary;
+  } else {
+    summary.erros.push(
+      `A Turma ${baseName} não está cadastrada. Crie a turma antes de importar a planilha.`
+    );
   }
+
+  return summary;
+}
 
   try {
     const arrayBuffer = await file.arrayBuffer();

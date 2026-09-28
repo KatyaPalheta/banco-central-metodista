@@ -4,17 +4,16 @@ import { TurmaId } from '../../domain/types';
 import { studentRepository } from '../../repositories/studentRepository';
 
 interface AddStudentModalProps {
-  initialTurma?: TurmaId;
+  initialTurma: TurmaId;
   onClose: () => void;
   onSuccess: () => void;
 }
 
 export const AddStudentModal: React.FC<AddStudentModalProps> = ({
-  initialTurma = '401',
+  initialTurma,
   onClose,
   onSuccess,
 }) => {
-  const [turma, setTurma] = useState<TurmaId>(initialTurma);
   const [nome, setNome] = useState('');
   const [numeroConta, setNumeroConta] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,7 +26,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
 
     try {
       const res = await studentRepository.addStudent({
-        turma,
+        turma: initialTurma,
         nome,
         numeroConta,
       });
@@ -75,16 +74,9 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
             <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
               Turma
             </label>
-            <select
-              value={turma}
-              onChange={(e) => setTurma(e.target.value as TurmaId)}
-              className="w-full py-2.5 px-3 rounded-xl border border-slate-300 font-bold text-slate-800 bg-white focus:outline-hidden focus:border-blue-500"
-            >
-              <option value="401">Turma 401 (Manhã)</option>
-              <option value="402">Turma 402 (Tarde)</option>
-              <option value="501">Turma 501 (Manhã)</option>
-              <option value="502">Turma 502 (Tarde)</option>
-            </select>
+            <div className="w-full py-2.5 px-3 rounded-xl border border-slate-200 font-bold text-slate-800 bg-slate-50">
+  Turma {initialTurma}
+</div>
           </div>
 
           {/* Nome do Aluno */}
